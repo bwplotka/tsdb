@@ -293,15 +293,22 @@ func ErrPostings(err error) Postings {
 
 // Intersect returns a new postings list over the intersection of the
 // input postings.
+// If any of the input postings was the EmptyPostings(), it returns EmptyPostings().
 func Intersect(its ...Postings) Postings {
 	if len(its) == 0 {
-		return emptyPostings
+		return EmptyPostings()
 	}
 	if len(its) == 1 {
 		return its[0]
 	}
 	l := len(its) / 2
-	return newIntersectPostings(Intersect(its[:l]...), Intersect(its[l:]...))
+	a := Intersect(its[:l]...)
+	b := Intersect(its[l:]...)
+
+	if a == EmptyPostings() || b == EmptyPostings() {
+		return EmptyPostings()
+	}
+	return newIntersectPostings(a, b)
 }
 
 type intersectPostings struct {
@@ -358,7 +365,8 @@ func (it *intersectPostings) Err() error {
 	return it.b.Err()
 }
 
-// Merge returns a new iterator over the union of the input iterators.
+// Merge returns a new iterator over the union of the input iterators. If all input postings
+// were EmptyPostings() it returns the EmptyPostings().
 func Merge(its ...Postings) Postings {
 	if len(its) == 0 {
 		return EmptyPostings()
@@ -378,6 +386,14 @@ func Merge(its ...Postings) Postings {
 		if it.Err() != nil {
 			return ErrPostings(it.Err())
 		}
+		//l := len(its) / 2
+		//a := Merge(its[:l]...)
+		//b := Merge(its[l:]...)
+		//
+		//if a == EmptyPostings() && b == EmptyPostings() {
+		//	return EmptyPostings()
+		//}
+		//return newMergedPostings(a, b)
 	}
 	pl := make([]uint64, 0, len(pm))
 	for p := range pm {
@@ -388,8 +404,12 @@ func Merge(its ...Postings) Postings {
 }
 
 // Without returns a new postings list that contains all elements from the full list that
-// are not in the drop list
+// are not in the drop list.
+// It returns EmptyPostings() if the full list is EmptyPostings().
 func Without(full, drop Postings) Postings {
+	if full == EmptyPostings() {
+		return full
+	}
 	return newRemovedPostings(full, drop)
 }
 
