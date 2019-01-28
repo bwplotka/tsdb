@@ -542,7 +542,7 @@ func TestBigEndian(t *testing.T) {
 }
 
 func TestIntersectWithMerge(t *testing.T) {
-	// One of the reproduceable cases for:
+	// One of the reproducible cases for:
 	// https://github.com/prometheus/prometheus/issues/2616
 	a := newListPostings([]uint64{21, 22, 23, 24, 25, 30})
 
@@ -564,6 +564,9 @@ func TestReduceToEmptyPostings(t *testing.T) {
 	c := EmptyPostings()
 
 	testutil.Assert(t, Intersect(a, b, c) == EmptyPostings(), "was not empty postings")
+	testutil.Assert(t, Intersect(c, b, a) == EmptyPostings(), "was not empty postings")
+	testutil.Assert(t, Intersect(a, c, b) == EmptyPostings(), "was not empty postings")
+	testutil.Assert(t, Intersect(c, a, b) == EmptyPostings(), "was not empty postings")
 	testutil.Assert(t, Merge(a, b, c) != EmptyPostings(), "should not be empty postings")
 	testutil.Assert(t, Merge(c, c, c) == EmptyPostings(), "was not empty postings")
 	testutil.Assert(t, Without(c, a) == EmptyPostings(), "was not empty postings")
