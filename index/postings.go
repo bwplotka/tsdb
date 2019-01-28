@@ -386,19 +386,16 @@ func Merge(its ...Postings) Postings {
 		if it.Err() != nil {
 			return ErrPostings(it.Err())
 		}
-		//l := len(its) / 2
-		//a := Merge(its[:l]...)
-		//b := Merge(its[l:]...)
-		//
-		//if a == EmptyPostings() && b == EmptyPostings() {
-		//	return EmptyPostings()
-		//}
-		//return newMergedPostings(a, b)
 	}
 	pl := make([]uint64, 0, len(pm))
 	for p := range pm {
 		pl = append(pl, p)
 	}
+
+	if len(pl) == 0 {
+		return EmptyPostings()
+	}
+
 	sort.Slice(pl, func(i, j int) bool { return pl[i] < pl[j] })
 	return newListPostings(pl)
 }
