@@ -563,15 +563,15 @@ func TestReduceToEmptyPostings(t *testing.T) {
 	b := newListPostings([]uint64{2, 3, 4})
 	empty := EmptyPostings()
 
-	testutil.Assert(t, Intersect(a, b, empty) == EmptyPostings(), "was not empty postings")
-	testutil.Assert(t, Intersect(b, a, empty) == EmptyPostings(), "was not empty postings")
-	testutil.Assert(t, Intersect(empty, b, a) == EmptyPostings(), "was not empty postings")
-	testutil.Assert(t, Intersect(empty, a, b) == EmptyPostings(), "was not empty postings")
-	testutil.Assert(t, Intersect(a, empty, b) == EmptyPostings(), "was not empty postings")
-	testutil.Assert(t, Intersect(b, empty, a) == EmptyPostings(), "was not empty postings")
+	testutil.Equals(t, Intersect(a, b, empty), EmptyPostings())
+	testutil.Equals(t, Intersect(b, a, empty), EmptyPostings())
+	testutil.Equals(t, Intersect(empty, b, a), EmptyPostings())
+	testutil.Equals(t, Intersect(empty, a, b), EmptyPostings())
+	testutil.Equals(t, Intersect(a, empty, b), EmptyPostings())
+	testutil.Equals(t, Intersect(b, empty, a), EmptyPostings())
 
-	testutil.Assert(t, Merge(a, b, empty) != EmptyPostings(), "should not be empty postings")
-	testutil.Assert(t, Merge(empty, empty, empty) == EmptyPostings(), "was not empty postings")
+	testutil.NotEquals(t, Merge(a, b, empty), EmptyPostings())
+	testutil.Equals(t, Merge(empty, empty, empty), EmptyPostings())
 
-	testutil.Assert(t, Without(empty, a) == EmptyPostings(), "was not empty postings")
+	testutil.Equals(t, Without(empty, a), EmptyPostings())
 }
