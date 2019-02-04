@@ -54,7 +54,7 @@ type Compactor interface {
 	// Results returned when compactions are in progress are undefined.
 	Plan(dir string) ([]string, error)
 
-	// Write persists a Block into a directory.
+	// Write persists index and chunks from a Block for samples overlaps with mint:maxt range into a directory.
 	// No Block is written when resulting Block has 0 samples, and returns empty ulid.ULID{}.
 	Write(dest string, b BlockReader, mint, maxt int64, parent *BlockMeta) (ulid.ULID, error)
 
@@ -471,7 +471,7 @@ func (w *instrumentedChunkWriter) WriteChunks(chunks ...chunks.Meta) error {
 	return w.ChunkWriter.WriteChunks(chunks...)
 }
 
-// write creates a new block that is the union of the provided blocks into dir.
+// write creates a new block that is the union of the provided blocks for the requested meta min and max time into dir.
 // It cleans up all files of the old blocks after completing successfully.
 func (c *LeveledCompactor) write(dest string, meta *BlockMeta, blocks ...BlockReader) (err error) {
 	dir := filepath.Join(dest, meta.ULID.String())
@@ -522,9 +522,12 @@ func (c *LeveledCompactor) write(dest string, meta *BlockMeta, blocks ...BlockRe
 	}
 	defer indexw.Close()
 
-	if err := c.populateBlock(blocks, meta, indexw, chunkw); err != nil {
+	stats, err := c.populateBlock(blocks, meta.MinTime, meta.MaxTime, indexw, chunkw)
+	if err != nil {
 		return errors.Wrap(err, "write compaction")
 	}
+	meta.Stats = stats
+
 	// We are explicitly closing them here to check for error even
 	// though these are covered under defer. This is because in Windows,
 	// you cannot delete these unless they are closed and the defer is to
@@ -582,41 +585,46 @@ func (c *LeveledCompactor) write(dest string, meta *BlockMeta, blocks ...BlockRe
 }
 
 // populateBlock fills the index and chunk writers with new data gathered as the union
-// of the provided blocks. It returns meta information for the new block.
-func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, indexw IndexWriter, chunkw ChunkWriter) error {
+// of the provided blocks that overlaps with requested min and max time.
+// It returns new block's statistics.
+func (c *LeveledCompactor) populateBlock(blocks []BlockReader, mint int64, maxt int64, indexw IndexWriter, chunkw ChunkWriter) (stats BlockStats, err error) {
 	if len(blocks) == 0 {
-		return errors.New("cannot populate block from no readers")
+		return BlockStats{}, errors.New("cannot populate block from no readers")
 	}
 
 	var (
 		set        ChunkSeriesSet
 		allSymbols = make(map[string]struct{}, 1<<16)
-		closers    = []io.Closer{}
+		closers    []io.Closer
 	)
-	defer func() { closeAll(closers...) }()
+	defer func() {
+		if err := closeAll(closers...); err != nil {
+			level.Error(c.logger).Log("msg", "one or more readers failed to close", "err", err.Error())
+		}
+	}()
 
 	for i, b := range blocks {
 		indexr, err := b.Index()
 		if err != nil {
-			return errors.Wrapf(err, "open index reader for block %s", b)
+			return BlockStats{}, errors.Wrapf(err, "open index reader for block %s", b)
 		}
 		closers = append(closers, indexr)
 
 		chunkr, err := b.Chunks()
 		if err != nil {
-			return errors.Wrapf(err, "open chunk reader for block %s", b)
+			return BlockStats{}, errors.Wrapf(err, "open chunk reader for block %s", b)
 		}
 		closers = append(closers, chunkr)
 
 		tombsr, err := b.Tombstones()
 		if err != nil {
-			return errors.Wrapf(err, "open tombstone reader for block %s", b)
+			return BlockStats{}, errors.Wrapf(err, "open tombstone reader for block %s", b)
 		}
 		closers = append(closers, tombsr)
 
 		symbols, err := indexr.Symbols()
 		if err != nil {
-			return errors.Wrap(err, "read symbols")
+			return BlockStats{}, errors.Wrap(err, "read symbols")
 		}
 		for s := range symbols {
 			allSymbols[s] = struct{}{}
@@ -624,7 +632,7 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, 
 
 		all, err := indexr.Postings(index.AllPostingsKey())
 		if err != nil {
-			return err
+			return BlockStats{}, err
 		}
 		all = indexr.SortedPostings(all)
 
@@ -636,7 +644,7 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, 
 		}
 		set, err = newCompactionMerger(set, s)
 		if err != nil {
-			return err
+			return BlockStats{}, err
 		}
 	}
 
@@ -648,7 +656,7 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, 
 	)
 
 	if err := indexw.AddSymbols(allSymbols); err != nil {
-		return errors.Wrap(err, "add symbols")
+		return BlockStats{}, errors.Wrap(err, "add symbols")
 	}
 
 	for set.Next() {
@@ -660,49 +668,67 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, 
 		}
 
 		for i, chk := range chks {
-			if chk.MinTime < meta.MinTime || chk.MaxTime > meta.MaxTime {
-				return errors.Errorf("found chunk with minTime: %d maxTime: %d outside of compacted minTime: %d maxTime: %d",
-					chk.MinTime, chk.MaxTime, meta.MinTime, meta.MaxTime)
+			// The way a populateBlock is used does not assume chunks before the requested min time.
+			// We can add support for that once it is needed.
+			if chk.MinTime < mint {
+				return BlockStats{}, errors.Errorf("found chunk with minTime: %d maxTime: %d outside of compacted minTime: %d maxTime: %d",
+					chk.MinTime, chk.MaxTime, mint, maxt)
 			}
 
-			if len(dranges) > 0 {
-				// Re-encode the chunk to not have deleted values.
-				if !chk.OverlapsClosedInterval(dranges[0].Mint, dranges[len(dranges)-1].Maxt) {
-					continue
-				}
-				newChunk := chunkenc.NewXORChunk()
-				app, err := newChunk.Appender()
-				if err != nil {
-					return err
-				}
-
-				it := &deletedIterator{it: chk.Chunk.Iterator(), intervals: dranges}
-				for it.Next() {
-					ts, v := it.At()
-					app.Append(ts, v)
-				}
-
-				chks[i].Chunk = newChunk
+			// It can happen that we get here chunk partially or completely outside of requested meta.MaxTime e.g
+			// when we snapshot from head block which is also used for appends concurrently to this method.
+			if chk.MinTime > maxt {
+				// Ignore block that is completely outside.
+				chks = append(chks[:i], chks[i+1:]...)
+				continue
 			}
+
+			if chk.MaxTime > maxt {
+				// Rewrite chunk that is partially outside.
+				dranges = append(dranges, Interval{Mint: maxt + 1, Maxt: chk.MaxTime})
+				sort.Slice(dranges, func(i, j int) bool {
+					return dranges[i].Mint < dranges[j].Maxt
+				})
+			}
+
+			if len(dranges) == 0 || !chk.OverlapsClosedInterval(dranges[0].Mint, dranges[len(dranges)-1].Maxt) {
+				continue
+			}
+
+			// Re-encode the chunk to not have deleted values or to match requested max time.
+			newChunk := chunkenc.NewXORChunk()
+			app, err := newChunk.Appender()
+			if err != nil {
+				return BlockStats{}, err
+			}
+
+			fmt.Println(dranges)
+			it := &deletedIterator{it: chk.Chunk.Iterator(), intervals: dranges}
+			for it.Next() {
+				ts, v := it.At()
+				app.Append(ts, v)
+			}
+
+			chks[i].Chunk = newChunk
 		}
 
 		if err := chunkw.WriteChunks(chks...); err != nil {
-			return errors.Wrap(err, "write chunks")
+			return BlockStats{}, errors.Wrap(err, "write chunks")
 		}
 
 		if err := indexw.AddSeries(i, lset, chks...); err != nil {
-			return errors.Wrap(err, "add series")
+			return BlockStats{}, errors.Wrap(err, "add series")
 		}
 
-		meta.Stats.NumChunks += uint64(len(chks))
-		meta.Stats.NumSeries++
+		stats.NumChunks += uint64(len(chks))
+		stats.NumSeries++
 		for _, chk := range chks {
-			meta.Stats.NumSamples += uint64(chk.Chunk.NumSamples())
+			stats.NumSamples += uint64(chk.Chunk.NumSamples())
 		}
 
 		for _, chk := range chks {
 			if err := c.chunkPool.Put(chk.Chunk); err != nil {
-				return errors.Wrap(err, "put chunk")
+				return BlockStats{}, errors.Wrap(err, "put chunk")
 			}
 		}
 
@@ -719,7 +745,7 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, 
 		i++
 	}
 	if set.Err() != nil {
-		return errors.Wrap(set.Err(), "iterate compaction set")
+		return BlockStats{}, errors.Wrap(set.Err(), "iterate compaction set")
 	}
 
 	s := make([]string, 0, 256)
@@ -730,16 +756,16 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, meta *BlockMeta, 
 			s = append(s, x)
 		}
 		if err := indexw.WriteLabelIndex([]string{n}, s); err != nil {
-			return errors.Wrap(err, "write label index")
+			return BlockStats{}, errors.Wrap(err, "write label index")
 		}
 	}
 
 	for _, l := range postings.SortedKeys() {
 		if err := indexw.WritePostings(l.Name, l.Value, postings.Get(l.Name, l.Value)); err != nil {
-			return errors.Wrap(err, "write postings")
+			return BlockStats{}, errors.Wrap(err, "write postings")
 		}
 	}
-	return nil
+	return stats, nil
 }
 
 type compactionSeriesSet struct {

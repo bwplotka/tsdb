@@ -585,7 +585,7 @@ func TestCompaction_populateBlock(t *testing.T) {
 		},
 		{
 			// This should not happened because head block is making sure the chunks are not crossing block boundaries.
-			title: "Populate from single block containing chunk outside of compact meta time range.",
+			title: "Populate from single block containing chunk that starts before compact meta time range.",
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
@@ -594,24 +594,39 @@ func TestCompaction_populateBlock(t *testing.T) {
 					},
 				},
 			},
-			compactMinTime: 0,
-			compactMaxTime: 20,
-			expErr:         errors.New("found chunk with minTime: 10 maxTime: 30 outside of compacted minTime: 0 maxTime: 20"),
+			compactMinTime: 2,
+			compactMaxTime: 30,
+			expErr:         errors.New("found chunk with minTime: 1 maxTime: 2 outside of compacted minTime: 2 maxTime: 30"),
 		},
 		{
-			// Introduced by https://github.com/prometheus/tsdb/issues/347.
-			title: "Populate from single block containing extra chunk",
+			title: "Populate from single block containing one chunk partially, one completely after of compact meta time range.",
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "issue347"},
-						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}},
+						// Includes chunk partially outside.
+						lset:   map[string]string{"a": "b"},
+						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}, {t: 21}, {t: 30}}},
+					},
+					{
+						// Includes chunk completely outside.
+						// Regression test against https://github.com/prometheus/tsdb/issues/347.
+						lset:   map[string]string{"a": "c"},
+						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}, {{t: 21}, {t: 30}}},
 					},
 				},
 			},
 			compactMinTime: 0,
-			compactMaxTime: 10,
-			expErr:         errors.New("found chunk with minTime: 10 maxTime: 20 outside of compacted minTime: 0 maxTime: 10"),
+			compactMaxTime: 20,
+			expSeriesSamples: []seriesSamples{
+				{
+					lset:   map[string]string{"a": "b"},
+					chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}},
+				},
+				{
+					lset:   map[string]string{"a": "c"},
+					chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}},
+				},
+			},
 		},
 		{
 			// No special deduplication expected.
@@ -659,7 +674,7 @@ func TestCompaction_populateBlock(t *testing.T) {
 			}
 
 			iw := &mockIndexWriter{}
-			err = c.populateBlock(blocks, meta, iw, nopChunkWriter{})
+			stats, err := c.populateBlock(blocks, meta.MinTime, meta.MaxTime, iw, nopChunkWriter{})
 			if tc.expErr != nil {
 				testutil.NotOk(t, err)
 				testutil.Equals(t, tc.expErr.Error(), err.Error())
@@ -679,7 +694,7 @@ func TestCompaction_populateBlock(t *testing.T) {
 					s.NumSamples += uint64(len(chk))
 				}
 			}
-			testutil.Equals(t, s, meta.Stats)
+			testutil.Equals(t, s, stats)
 		}); !ok {
 			return
 		}
