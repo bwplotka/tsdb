@@ -442,15 +442,21 @@ func TestCompaction_populateBlock(t *testing.T) {
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 0}, {t: 10}}, {{t: 11}, {t: 20}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 0}, {t: 10}},
+							{{t: 11}, {t: 20}},
+						},
 					},
 				},
 			},
 			expSeriesSamples: []seriesSamples{
 				{
-					lset:   map[string]string{"a": "b"},
-					chunks: [][]sample{{{t: 0}, {t: 10}}, {{t: 11}, {t: 20}}},
+					lset: map[string]string{"a": "b"},
+					chunks: [][]sample{
+						{{t: 0}, {t: 10}},
+						{{t: 11}, {t: 20}},
+					},
 				},
 			},
 		},
@@ -459,12 +465,18 @@ func TestCompaction_populateBlock(t *testing.T) {
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 0}, {t: 10}}, {{t: 11}, {t: 20}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 0}, {t: 10}},
+							{{t: 11}, {t: 20}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "c"},
-						chunks: [][]sample{{{t: 1}, {t: 9}}, {{t: 10}, {t: 19}}},
+						lset: map[string]string{"a": "c"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 9}},
+							{{t: 10}, {t: 19}},
+						},
 					},
 					{
 						// no-chunk series should be dropped.
@@ -473,23 +485,35 @@ func TestCompaction_populateBlock(t *testing.T) {
 				},
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 21}, {t: 30}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 21}, {t: 30}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "c"},
-						chunks: [][]sample{{{t: 40}, {t: 45}}},
+						lset: map[string]string{"a": "c"},
+						chunks: [][]sample{
+							{{t: 40}, {t: 45}},
+						},
 					},
 				},
 			},
 			expSeriesSamples: []seriesSamples{
 				{
-					lset:   map[string]string{"a": "b"},
-					chunks: [][]sample{{{t: 0}, {t: 10}}, {{t: 11}, {t: 20}}, {{t: 21}, {t: 30}}},
+					lset: map[string]string{"a": "b"},
+					chunks: [][]sample{
+						{{t: 0}, {t: 10}},
+						{{t: 11}, {t: 20}},
+						{{t: 21}, {t: 30}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "c"},
-					chunks: [][]sample{{{t: 1}, {t: 9}}, {{t: 10}, {t: 19}}, {{t: 40}, {t: 45}}},
+					lset: map[string]string{"a": "c"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 9}},
+						{{t: 10}, {t: 19}},
+						{{t: 40}, {t: 45}},
+					},
 				},
 			},
 		},
@@ -498,33 +522,51 @@ func TestCompaction_populateBlock(t *testing.T) {
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 21}, {t: 30}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 21}, {t: 30}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "c"},
-						chunks: [][]sample{{{t: 40}, {t: 45}}},
+						lset: map[string]string{"a": "c"},
+						chunks: [][]sample{
+							{{t: 40}, {t: 45}},
+						},
 					},
 				},
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 0}, {t: 10}}, {{t: 11}, {t: 20}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 0}, {t: 10}},
+							{{t: 11}, {t: 20}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "c"},
-						chunks: [][]sample{{{t: 1}, {t: 9}}, {{t: 10}, {t: 19}}},
+						lset: map[string]string{"a": "c"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 9}},
+							{{t: 10}, {t: 19}},
+						},
 					},
 				},
 			},
 			expSeriesSamples: []seriesSamples{
 				{
-					lset:   map[string]string{"a": "b"},
-					chunks: [][]sample{{{t: 21}, {t: 30}}, {{t: 0}, {t: 10}}, {{t: 11}, {t: 20}}},
+					lset: map[string]string{"a": "b"},
+					chunks: [][]sample{
+						{{t: 21}, {t: 30}},
+						{{t: 0}, {t: 10}},
+						{{t: 11}, {t: 20}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "c"},
-					chunks: [][]sample{{{t: 40}, {t: 45}}, {{t: 1}, {t: 9}}, {{t: 10}, {t: 19}}},
+					lset: map[string]string{"a": "c"},
+					chunks: [][]sample{
+						{{t: 40}, {t: 45}},
+						{{t: 1}, {t: 9}},
+						{{t: 10}, {t: 19}},
+					},
 				},
 			},
 		},
@@ -533,53 +575,76 @@ func TestCompaction_populateBlock(t *testing.T) {
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "4"},
-						chunks: [][]sample{{{t: 5}, {t: 7}}},
+						lset: map[string]string{"a": "4"},
+						chunks: [][]sample{
+							{{t: 5}, {t: 7}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "3"},
-						chunks: [][]sample{{{t: 5}, {t: 6}}},
+						lset: map[string]string{"a": "3"},
+						chunks: [][]sample{
+							{{t: 5}, {t: 6}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "same"},
-						chunks: [][]sample{{{t: 1}, {t: 4}}},
+						lset: map[string]string{"a": "same"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 4}},
+						},
 					},
 				},
 				{
 					{
-						lset:   map[string]string{"a": "2"},
-						chunks: [][]sample{{{t: 1}, {t: 3}}},
+						lset: map[string]string{"a": "2"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 3}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "1"},
-						chunks: [][]sample{{{t: 1}, {t: 2}}},
+						lset: map[string]string{"a": "1"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 2}},
+						},
 					},
 					{
-						lset:   map[string]string{"a": "same"},
-						chunks: [][]sample{{{t: 5}, {t: 8}}},
+						lset: map[string]string{"a": "same"},
+						chunks: [][]sample{
+							{{t: 5}, {t: 8}},
+						},
 					},
 				},
 			},
 			expSeriesSamples: []seriesSamples{
 				{
-					lset:   map[string]string{"a": "1"},
-					chunks: [][]sample{{{t: 1}, {t: 2}}},
+					lset: map[string]string{"a": "1"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 2}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "2"},
-					chunks: [][]sample{{{t: 1}, {t: 3}}},
+					lset: map[string]string{"a": "2"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 3}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "3"},
-					chunks: [][]sample{{{t: 5}, {t: 6}}},
+					lset: map[string]string{"a": "3"},
+					chunks: [][]sample{
+						{{t: 5}, {t: 6}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "4"},
-					chunks: [][]sample{{{t: 5}, {t: 7}}},
+					lset: map[string]string{"a": "4"},
+					chunks: [][]sample{
+						{{t: 5}, {t: 7}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "same"},
-					chunks: [][]sample{{{t: 1}, {t: 4}}, {{t: 5}, {t: 8}}},
+					lset: map[string]string{"a": "same"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 4}},
+						{{t: 5}, {t: 8}},
+					},
 				},
 			},
 		},
@@ -589,8 +654,11 @@ func TestCompaction_populateBlock(t *testing.T) {
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 30}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 2}},
+							{{t: 10}, {t: 30}},
+						},
 					},
 				},
 			},
@@ -604,14 +672,21 @@ func TestCompaction_populateBlock(t *testing.T) {
 				{
 					{
 						// Includes chunk partially outside.
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}, {t: 21}, {t: 30}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 2}},
+							{{t: 10}, {t: 20}, {t: 21}, {t: 30}},
+						},
 					},
 					{
 						// Includes chunk completely outside.
 						// Regression test against https://github.com/prometheus/tsdb/issues/347.
-						lset:   map[string]string{"a": "c"},
-						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}, {{t: 21}, {t: 30}}},
+						lset: map[string]string{"a": "c"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 2}},
+							{{t: 10}, {t: 20}},
+							{{t: 21}, {t: 30}},
+						},
 					},
 				},
 			},
@@ -619,12 +694,18 @@ func TestCompaction_populateBlock(t *testing.T) {
 			compactMaxTime: 20,
 			expSeriesSamples: []seriesSamples{
 				{
-					lset:   map[string]string{"a": "b"},
-					chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}},
+					lset: map[string]string{"a": "b"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 2}},
+						{{t: 10}, {t: 20}},
+					},
 				},
 				{
-					lset:   map[string]string{"a": "c"},
-					chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}},
+					lset: map[string]string{"a": "c"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 2}},
+						{{t: 10}, {t: 20}},
+					},
 				},
 			},
 		},
@@ -634,21 +715,30 @@ func TestCompaction_populateBlock(t *testing.T) {
 			inputSeriesSamples: [][]seriesSamples{
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 1}, {t: 2}},
+							{{t: 10}, {t: 20}},
+						},
 					},
 				},
 				{
 					{
-						lset:   map[string]string{"a": "b"},
-						chunks: [][]sample{{{t: 10}, {t: 20}}},
+						lset: map[string]string{"a": "b"},
+						chunks: [][]sample{
+							{{t: 10}, {t: 20}},
+						},
 					},
 				},
 			},
 			expSeriesSamples: []seriesSamples{
 				{
-					lset:   map[string]string{"a": "b"},
-					chunks: [][]sample{{{t: 1}, {t: 2}}, {{t: 10}, {t: 20}}, {{t: 10}, {t: 20}}},
+					lset: map[string]string{"a": "b"},
+					chunks: [][]sample{
+						{{t: 1}, {t: 2}},
+						{{t: 10}, {t: 20}},
+						{{t: 10}, {t: 20}},
+					},
 				},
 			},
 		},
@@ -665,16 +755,12 @@ func TestCompaction_populateBlock(t *testing.T) {
 			c, err := NewLeveledCompactor(nil, nil, []int64{0}, nil)
 			testutil.Ok(t, err)
 
-			meta := &BlockMeta{
-				MinTime: tc.compactMinTime,
-				MaxTime: tc.compactMaxTime,
-			}
-			if meta.MaxTime == 0 {
-				meta.MaxTime = math.MaxInt64
+			if tc.compactMaxTime == 0 {
+				tc.compactMaxTime = math.MaxInt64
 			}
 
 			iw := &mockIndexWriter{}
-			stats, err := c.populateBlock(blocks, meta.MinTime, meta.MaxTime, iw, nopChunkWriter{})
+			stats, err := c.populateBlock(blocks, tc.compactMinTime, tc.compactMaxTime, iw, nopChunkWriter{})
 			if tc.expErr != nil {
 				testutil.NotOk(t, err)
 				testutil.Equals(t, tc.expErr.Error(), err.Error())

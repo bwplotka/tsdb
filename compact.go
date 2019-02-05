@@ -54,8 +54,10 @@ type Compactor interface {
 	// Results returned when compactions are in progress are undefined.
 	Plan(dir string) ([]string, error)
 
-	// Write persists index and chunks from a Block for samples overlaps with mint:maxt range into a directory.
-	// No Block is written when resulting Block has 0 samples, and returns empty ulid.ULID{}.
+	// Write persists a Block into a directory by
+	// including data within the requested mint:maxt range.
+	// No Block is written when resulting Block has 0 samples and
+	// returns empty ulid.ULID{}.
 	Write(dest string, b BlockReader, mint, maxt int64, parent *BlockMeta) (ulid.ULID, error)
 
 	// Compact runs compaction against the provided directories. Must
@@ -471,8 +473,10 @@ func (w *instrumentedChunkWriter) WriteChunks(chunks ...chunks.Meta) error {
 	return w.ChunkWriter.WriteChunks(chunks...)
 }
 
-// write creates a new block that is the union of the provided blocks for the requested meta min and max time into dir.
-// It cleans up all files of the old blocks after completing successfully.
+// write creates a new block that is the union of the provided blocks.
+// Removes chunks complete outside the given meta mint,maxt.
+// Rewrites chunks partially outside the given meta mint,maxt.
+// Cleans up all files of the old blocks after completing successfully.
 func (c *LeveledCompactor) write(dest string, meta *BlockMeta, blocks ...BlockReader) (err error) {
 	dir := filepath.Join(dest, meta.ULID.String())
 	tmp := dir + ".tmp"
@@ -668,23 +672,20 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, mint int64, maxt 
 		}
 
 		for i, chk := range chks {
-			// The way a populateBlock is used does not assume chunks before the requested min time.
-			// We can add support for that once it is needed.
+			// Current usecases don't require handling chunks before the requested mint.
 			if chk.MinTime < mint {
 				return BlockStats{}, errors.Errorf("found chunk with minTime: %d maxTime: %d outside of compacted minTime: %d maxTime: %d",
 					chk.MinTime, chk.MaxTime, mint, maxt)
 			}
 
-			// It can happen that we get here chunk partially or completely outside of requested meta.MaxTime e.g
-			// when we snapshot from head block which is also used for appends concurrently to this method.
-			if chk.MinTime > maxt {
-				// Ignore block that is completely outside.
+			// During snapshotting an append to a chunk can happen after requesting mint,maxt
+			// so data outside the expected time range should to be removed
+			if chk.MinTime > maxt { // Remove chunk that is completely outside.
 				chks = append(chks[:i], chks[i+1:]...)
 				continue
 			}
 
-			if chk.MaxTime > maxt {
-				// Rewrite chunk that is partially outside.
+			if chk.MaxTime > maxt { // Remove chunk values outside the requested mint,maxt.
 				dranges = append(dranges, Interval{Mint: maxt + 1, Maxt: chk.MaxTime})
 				sort.Slice(dranges, func(i, j int) bool {
 					return dranges[i].Mint < dranges[j].Maxt
@@ -695,14 +696,13 @@ func (c *LeveledCompactor) populateBlock(blocks []BlockReader, mint int64, maxt 
 				continue
 			}
 
-			// Re-encode the chunk to not have deleted values or to match requested max time.
+			// Rewrite chunk to remove deleted values.
 			newChunk := chunkenc.NewXORChunk()
 			app, err := newChunk.Appender()
 			if err != nil {
 				return BlockStats{}, err
 			}
 
-			fmt.Println(dranges)
 			it := &deletedIterator{it: chk.Chunk.Iterator(), intervals: dranges}
 			for it.Next() {
 				ts, v := it.At()
