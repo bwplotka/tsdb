@@ -1138,14 +1138,25 @@ func (h *headIndexReader) Series(ref uint64, lbls *labels.Labels, chks *[]chunks
 
 	*chks = (*chks)[:0]
 
+	s.Lock()
+	chksLen := len(s.chunks)
+	s.Unlock()
+
 	for i, c := range s.chunks {
 		// Do not expose chunks that are outside of the specified range.
 		if !c.OverlapsClosedInterval(h.mint, h.maxt) {
 			continue
 		}
+
+		maxTime := c.maxTime
+		if i >= (chksLen -1) {
+			// Assumed as opened chunk.
+			maxTime = math.MaxInt64
+		}
+
 		*chks = append(*chks, chunks.Meta{
 			MinTime: c.minTime,
-			MaxTime: c.maxTime,
+			MaxTime: maxTime,
 			Ref:     packChunkID(s.ref, uint64(s.chunkID(i))),
 		})
 	}
